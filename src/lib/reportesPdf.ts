@@ -23,6 +23,35 @@ function fit(s: string, f: PDFFont, size: number, max: number) {
   return t;
 }
 
+function wrap(s: string, f: PDFFont, size: number, max: number) {
+  const words = s.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (f.widthOfTextAtSize(candidate, size) <= max) {
+      line = candidate;
+      continue;
+    }
+    if (line) lines.push(line);
+    if (f.widthOfTextAtSize(word, size) <= max) {
+      line = word;
+      continue;
+    }
+    let fragment = "";
+    for (const char of word) {
+      if (fragment && f.widthOfTextAtSize(`${fragment}${char}`, size) > max) {
+        lines.push(fragment);
+        fragment = char;
+      } else fragment += char;
+    }
+    line = fragment;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 interface Col {
   label: string;
   w: number;
@@ -96,6 +125,41 @@ class Doc {
       const tw = f.widthOfTextAtSize(t, 8);
       const tx = opts.head ? x + (c.w - tw) / 2 : c.right ? x + c.w - tw - 3 : x + 3;
       this.page.drawText(t, { x: tx, y: this.y - h + 4.5, size: 8, font: f });
+      x += c.w;
+    });
+    this.y -= h;
+  }
+
+  centeredWrappedRow(cols: Col[], vals: string[], opts: { head?: boolean; bold?: boolean } = {}) {
+    const size = 7.5;
+    const leading = 8.5;
+    const f = opts.head || opts.bold ? this.bold : this.font;
+    const lines = cols.map((c, i) => wrap(vals[i] ?? "", f, size, c.w - 6));
+    const h = Math.max(17, Math.max(...lines.map((cell) => cell.length)) * leading + 6);
+    this.ensure(h);
+    let x = M;
+    cols.forEach((c, i) => {
+      this.page.drawRectangle({
+        x,
+        y: this.y - h,
+        width: c.w,
+        height: h,
+        borderColor: black,
+        borderWidth: 0.6,
+        ...(opts.head ? { color: gray } : {}),
+      });
+      const cell = lines[i];
+      const blockHeight = cell.length * leading;
+      const firstBaseline = this.y - (h - blockHeight) / 2 - size;
+      cell.forEach((text, lineIndex) => {
+        const tw = f.widthOfTextAtSize(text, size);
+        this.page.drawText(text, {
+          x: x + (c.w - tw) / 2,
+          y: firstBaseline - lineIndex * leading,
+          size,
+          font: f,
+        });
+      });
       x += c.w;
     });
     this.y -= h;
@@ -322,26 +386,26 @@ export interface FilaLista extends Invoice {
 }
 
 export const estadoFactura = (f: FilaLista) =>
-  [f.anulada ? "ANULADA" : "", f.notaCredito ? "NOTA CRÉDITO" : "", f.novedad ? "NOVEDAD" : ""].filter(Boolean).join(" / ");
+  [f.anulada ? "ANULADA" : "", f.notaCredito ? "N.C" : "", f.novedad ? "NOVEDAD" : ""].filter(Boolean).join(" / ");
 
 /** Lista de facturas filtrada (PDF). Los totales no cuentan anuladas. */
 export async function buildListaFacturasPdf(rows: FilaLista[], periodo: string) {
   const d = await Doc.create("LISTA DE FACTURAS", periodo);
   const cols: Col[] = [
-    { label: "CLIENTE", w: 120 }, { label: "FECHA", w: 48 }, { label: "FACTURA", w: 50 },
-    { label: "KILOS / CAJAS", w: 62, right: true }, { label: "VENTA", w: 56, right: true },
-    { label: "LUGAR", w: 70 }, { label: "VENDEDOR", w: 80 }, { label: "ESTADO", w: 70 },
+    { label: "CLIENTE", w: 140 }, { label: "FECHA", w: 50 }, { label: "FACTURA", w: 44 },
+    { label: "KILOS / CAJAS", w: 61 }, { label: "VENTA", w: 51 },
+    { label: "LUGAR", w: 67 }, { label: "VENDEDOR", w: 73 }, { label: "ESTADO", w: 70 },
   ];
-  d.row(cols, cols.map((c) => c.label), { head: true });
+  d.centeredWrappedRow(cols, cols.map((c) => c.label), { head: true });
   rows.forEach((i) =>
-    d.row(cols, [
+    d.centeredWrappedRow(cols, [
       i.cliente, formatDate(i.fecha), i.factura,
       i.diario ? `${i.cajas ?? 0} cj / ${i.und ?? 0} und` : n2(i.kilos),
       n2(i.venta), i.lugar, i.vendedor, estadoFactura(i),
     ]),
   );
   const act = rows.filter((r) => !r.anulada);
-  d.row(cols, ["TOTAL", "", `${act.length} fact.`, n2(act.reduce((s, i) => s + (i.kilos || 0), 0)), n2(act.reduce((s, i) => s + (i.venta || 0), 0)), "", "", ""], { bold: true });
+  d.centeredWrappedRow(cols, ["TOTAL", "", `${act.length} fact.`, n2(act.reduce((s, i) => s + (i.kilos || 0), 0)), n2(act.reduce((s, i) => s + (i.venta || 0), 0)), "", "", ""], { bold: true });
   if (rows.length === 0) d.heading("No hay facturas para esos filtros.");
   return d.bytes();
 }
