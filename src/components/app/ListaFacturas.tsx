@@ -10,8 +10,8 @@ import { ordenarPorCorrelativo, useFacturasTodas } from "@/lib/facturas";
 import { buildListaFacturasPdf, estadoFactura } from "@/lib/reportesPdf";
 import { buildListaFacturasExcel } from "@/lib/excel";
 import { listChecklists, printPdf, saveReporte } from "@/lib/desktop";
-import { buildChecklistPdf } from "@/lib/checklistPdf";
-import type { Checklist } from "@/lib/types";
+import { buildChecklistFacturaPdf } from "@/lib/checklistPdf";
+import type { Checklist, ChecklistDatos } from "@/lib/types";
 
 const uniq = (l: string[]) => Array.from(new Set(l.filter(Boolean))).sort();
 
@@ -33,16 +33,18 @@ export function ListaFacturas() {
   const [cks, setCks] = useState<Checklist[]>([]);
   useEffect(() => { void listChecklists().then(setCks); }, [lista]);
   const ckPorFactura = useMemo(() => {
-    const m = new Map<string, Checklist>();
+    const m = new Map<string, ChecklistDatos>();
     cks.filter((c) => (c.estado ?? "pendiente") === "completado").forEach((c) => {
-      [c.factura, c.segundo?.factura].forEach((n) => { if (n?.trim() && !m.has(n.trim())) m.set(n.trim(), c); });
+      if (c.factura?.trim() && !m.has(c.factura.trim())) m.set(c.factura.trim(), c);
+      if (c.segundo?.factura?.trim() && !m.has(c.segundo.factura.trim())) m.set(c.segundo.factura.trim(), c.segundo);
     });
     return m;
   }, [cks]);
   const [verCk, setVerCk] = useState<{ factura: string; data: Uint8Array } | null>(null);
   const abrirCk = async (factura: string) => {
     const c = ckPorFactura.get(factura.trim());
-    if (c) setVerCk({ factura, data: await buildChecklistPdf(c) });
+    const f = lista.find((item) => item.factura.trim() === factura.trim());
+    if (c) setVerCk({ factura, data: await buildChecklistFacturaPdf(c, f?.notaCredito) });
   };
 
   const vendedores = useMemo(() => uniq(lista.map((f) => f.vendedor)), [lista]);
