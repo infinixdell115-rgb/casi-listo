@@ -50,7 +50,10 @@ export function Novedades() {
   };
   const invSel = invoices.find((i) => i.id === facturaSel) as FacturaDb | undefined;
   const facturado = invSel ? (invSel.kilosFacturados ?? invSel.kilos) : 0;
-  const recibido = items.length ? items.reduce((s, i) => s + i.recibido, 0) + Math.max(0, facturado - items.reduce((s, i) => s + i.facturado, 0)) : num(recibidoTotal);
+  // Con checklist: kilos de la factura menos la suma de las diferencias por producto.
+  const recibido = items.length
+    ? Math.max(0, facturado - items.reduce((s, i) => s + Math.max(0, i.facturado - i.recibido), 0))
+    : num(recibidoTotal);
   const [buscar, setBuscar] = useState("");
 
   const lista = useMemo(() => {
@@ -74,7 +77,12 @@ export function Novedades() {
       toast.error("Escribe la novedad.");
       return;
     }
-    if (tipo === "nc" && recibido > facturado + 0.001) {
+    const excedido = items.find((i) => i.recibido > i.facturado + 0.001);
+    if (tipo === "nc" && excedido) {
+      toast.error(`En ${excedido.producto} los kilos recibidos no pueden ser más que los facturados (${excedido.facturado.toFixed(2)}).`);
+      return;
+    }
+    if (tipo === "nc" && !items.length && recibido > facturado + 0.001) {
       toast.error("Los kilos recibidos no pueden ser más que los facturados.");
       return;
     }
@@ -145,7 +153,7 @@ export function Novedades() {
               </Field>
             )}
             <p className="mt-2 text-sm font-semibold">
-              Recibió {recibido.toFixed(2)} kg · Nota de crédito: {(recibido - facturado).toFixed(2)} kg
+              Nota de crédito: {(recibido - facturado).toFixed(2)} kg · Kilos de la factura: {recibido.toFixed(2)} kg
             </p>
           </div>
         )}
