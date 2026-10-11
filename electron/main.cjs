@@ -12,6 +12,7 @@ function createWindow() {
     width: 1280,
     height: 860,
     title: "Facturación y Despacho - Inversiones El Cibao",
+    icon: path.join(__dirname, "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

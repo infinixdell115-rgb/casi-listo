@@ -17,3 +17,4 @@
 - Invoice edit/delete are permission flags (`facturas_editar`, `facturas_eliminar`) stored in the same `modulos` list and checked on PUT/DELETE /api/facturas/:id. Why: admin grants them per user.
 - "Pendientes" are client-level backorders stored in `db.pendientes` (cliente, zona, vendedor, productos[]), separate from invoices. Why: tracks goods owed on the next dispatch.
 - Credit notes (nota_credito on the invoice) never change the stored kilos; toFactura exposes effective kilos as `kilos` and originals as `kilosFacturados`. Why: removing the note restores the original totals.
+- The Electron window and Windows package icon are generated from the same embedded Cibao logo used in PDFs. Why: the desktop app must keep one recognizable brand identity.
