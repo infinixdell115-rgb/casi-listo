@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { FileDown, FileSpreadsheet, Pencil, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ClipboardList, FileDown, Printer, FileSpreadsheet, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, Card, EmptyState, Field, TextInput, inputClass } from "./ui";
 import { useStore, type FacturaDb } from "@/lib/store";
@@ -9,7 +9,9 @@ import { isViveres } from "@/lib/types";
 import { ordenarPorCorrelativo, useFacturasTodas } from "@/lib/facturas";
 import { buildListaFacturasPdf, estadoFactura } from "@/lib/reportesPdf";
 import { buildListaFacturasExcel } from "@/lib/excel";
-import { saveReporte } from "@/lib/desktop";
+import { listChecklists, printPdf, saveReporte } from "@/lib/desktop";
+import { buildChecklistPdf } from "@/lib/checklistPdf";
+import type { Checklist } from "@/lib/types";
 
 const uniq = (l: string[]) => Array.from(new Set(l.filter(Boolean))).sort();
 
@@ -28,6 +30,20 @@ export function ListaFacturas() {
   const [tipo, setTipo] = useState<"" | "viveres" | "normal">("");
   const [verAnuladas, setVerAnuladas] = useState(false);
   const [edit, setEdit] = useState<FacturaDb | null>(null);
+  const [cks, setCks] = useState<Checklist[]>([]);
+  useEffect(() => { void listChecklists().then(setCks); }, [lista]);
+  const ckPorFactura = useMemo(() => {
+    const m = new Map<string, Checklist>();
+    cks.filter((c) => (c.estado ?? "pendiente") === "completado").forEach((c) => {
+      [c.factura, c.segundo?.factura].forEach((n) => { if (n?.trim() && !m.has(n.trim())) m.set(n.trim(), c); });
+    });
+    return m;
+  }, [cks]);
+  const [verCk, setVerCk] = useState<{ factura: string; data: Uint8Array } | null>(null);
+  const abrirCk = async (factura: string) => {
+    const c = ckPorFactura.get(factura.trim());
+    if (c) setVerCk({ factura, data: await buildChecklistPdf(c) });
+  };
 
   const vendedores = useMemo(() => uniq(lista.map((f) => f.vendedor)), [lista]);
   const zonas = useMemo(() => uniq(lista.map((f) => f.lugar)), [lista]);
@@ -146,7 +162,7 @@ export function ListaFacturas() {
                 <th className="px-2 py-2 text-left">Zona</th>
                 <th className="px-2 py-2 text-left">Vendedor</th>
                 {user.esAdmin && <th className="px-2 py-2 text-left">Registró</th>}
-                {(puedeEditar || puedeBorrar) && <th />}
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -161,8 +177,13 @@ export function ListaFacturas() {
                   <td className="px-2 py-1.5">{f.lugar}</td>
                   <td className="px-2 py-1.5">{f.vendedor}</td>
                   {user.esAdmin && <td className="px-2 py-1.5">{f.creadoPor || "—"}</td>}
-                  {(puedeEditar || puedeBorrar) && (
+                  {(
                     <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                      {ckPorFactura.has(f.factura.trim()) && (
+                        <button className="mr-2 inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs text-primary hover:bg-muted" onClick={() => void abrirCk(f.factura)}>
+                          <ClipboardList className="size-3.5" />Previsualizar
+                        </button>
+                      )}
                       {puedeEditar && (
                         <button className="mr-2 text-muted-foreground hover:text-primary" aria-label="Editar" onClick={() => setEdit(f)}>
                           <Pencil className="size-4" />
@@ -182,6 +203,7 @@ export function ListaFacturas() {
         </div>
       )}
 
+      {verCk && <VerChecklist factura={verCk.factura} data={verCk.data} onClose={() => setVerCk(null)} />}
       {edit && (
         <EditarFactura
           f={edit}
@@ -254,6 +276,23 @@ function EditarFactura({ f, vendedores, onClose, onSaved }: { f: FacturaDb; vend
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button disabled={saving} onClick={() => void guardar()}>Guardar cambios</Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function VerChecklist({ factura, data, onClose }: { factura: string; data: Uint8Array; onClose: () => void }) {
+  const url = useMemo(() => URL.createObjectURL(new Blob([data as BlobPart], { type: "application/pdf" })), [data]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
+      <div className="flex h-[90vh] w-full max-w-4xl flex-col rounded-lg border border-border bg-card shadow-xl">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+          <strong className="text-sm">Checklist de la factura {factura}</strong>
+          <Button variant="outline" className="ml-auto" onClick={() => void printPdf(data, false)}><Printer className="size-4" />Imprimir</Button>
+          <button aria-label="Cerrar" onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="size-5" /></button>
+        </div>
+        <iframe title="Checklist" src={url} className="flex-1 w-full" />
       </div>
     </div>
   );

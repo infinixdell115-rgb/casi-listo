@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { LOGO_PNG_BASE64 } from "@/assets/logo";
 import { formatDate } from "./excel";
 import { splitVendedor, type Invoice } from "./types";
+import { agrupar, normalizar, type FilaProducto } from "./checklistStats";
 
 const W = 612;
 const H = 792;
@@ -107,10 +108,34 @@ class Doc {
 
 const n2 = (v: number) => v.toFixed(2);
 
+/** Productos (de los checklist asociados) de las facturas del reporte, total y por zona. */
+function seccionProductos(d: Doc, invoices: Invoice[], filas?: FilaProducto[]) {
+  if (!filas) return;
+  const nums = new Set(invoices.map((i) => (i.factura || "").trim()).filter(Boolean));
+  const zonaDe = new Map(invoices.map((i) => [(i.factura || "").trim(), (i.lugar || "").trim().toUpperCase() || "SIN ZONA"]));
+  const mias = filas.filter((r) => nums.has(r.factura.trim())).map((r) => ({ ...r, zona: zonaDe.get(r.factura.trim()) ?? r.zona }));
+  const conCk = new Set(mias.map((r) => r.factura.trim()));
+  const cols: Col[] = [{ label: "PRODUCTO", w: 340 }, { label: "KILOS", w: 120, right: true }, { label: "%", w: 96, right: true }];
+  const tabla = (titulo: string, l: FilaProducto[]) => {
+    d.heading(titulo);
+    d.row(cols, cols.map((c) => c.label), { head: true });
+    agrupar(l, "producto").forEach((g) => d.row(cols, [g.nombre, n2(g.kilos), `${g.pct.toFixed(1)}%`]));
+    d.row(cols, ["TOTAL", n2(l.reduce((s, r) => s + r.kilos, 0)), "100%"], { bold: true });
+  };
+  if (mias.length === 0) { d.heading("PRODUCTOS VENDIDOS: ninguna factura tiene checklist asociado."); return; }
+  tabla("PRODUCTOS VENDIDOS (CHECKLIST)", mias);
+  const zonas = new Map<string, FilaProducto[]>();
+  mias.forEach((r) => zonas.set(normalizar(r.zona), [...(zonas.get(normalizar(r.zona)) ?? []), r]));
+  [...zonas.values()].sort((a, b) => b.reduce((s, r) => s + r.kilos, 0) - a.reduce((s, r) => s + r.kilos, 0))
+    .forEach((l) => tabla(`PRODUCTOS · ZONA ${l[0]?.zona ?? ""}`, l));
+  const sin = nums.size - conCk.size;
+  if (sin > 0) d.heading(`Nota: ${sin} factura(s) de este reporte no tienen checklist asociado.`);
+}
+
 const DIAS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "DIARIO"];
 
 /** Relación de ventas diarias: una sección por día (como las hojas de LUNES a VIERNES). */
-export async function buildVentasDiariasPdf(invoices: Invoice[], semana: string, periodo?: string) {
+export async function buildVentasDiariasPdf(invoices: Invoice[], semana: string, periodo?: string, filas?: FilaProducto[]) {
   const d = await Doc.create("RELACIÓN DE VENTAS DIARIAS", periodo ?? `Semana del ${formatDate(semana)}`);
   const cols: Col[] = [
     { label: "CLIENTE", w: 150 },
@@ -153,11 +178,12 @@ export async function buildVentasDiariasPdf(invoices: Invoice[], semana: string,
     const t: Col[] = [{ label: "", w: 258 }, { label: "", w: 60, right: true }, { label: "", w: 62, right: true }];
     d.row(t, [`${invoices.length} facturas`, n2(gk), n2(gv)], { bold: true });
   }
+  seccionProductos(d, invoices, filas);
   return d.bytes();
 }
 
 /** Reporte de kilos y ventas agrupado por vendedor, con detalle por marca. */
-export async function buildKilosVendedorPdf(invoices: Invoice[], semana: string, periodo?: string) {
+export async function buildKilosVendedorPdf(invoices: Invoice[], semana: string, periodo?: string, filas?: FilaProducto[]) {
   const d = await Doc.create("REPORTE DE KILOS POR VENDEDOR", periodo ?? `Semana del ${formatDate(semana)}`);
   const map = new Map<string, Invoice[]>();
   invoices.forEach((i) => {
@@ -223,6 +249,7 @@ export async function buildKilosVendedorPdf(invoices: Invoice[], semana: string,
       { bold: true },
     );
   });
+  seccionProductos(d, invoices, filas);
   return d.bytes();
 }
 
@@ -232,6 +259,7 @@ export async function buildVendedorPorFechaPdf(
   invoices: Invoice[],
   periodo: string,
   tipo: "kilos" | "viveres",
+  filas?: FilaProducto[],
 ) {
   const d = await Doc.create(tipo === "kilos" ? `REPORTE DE KILOS · ${vendedor}` : `REPORTE DE VÍVERES · ${vendedor}`, periodo);
   const cols: Col[] =
@@ -266,6 +294,7 @@ export async function buildVendedorPorFechaPdf(
       ? ["TOTAL", `${invoices.length} fact.`, "", "", n2(sum(invoices, "kilos")), n2(sum(invoices, "venta"))]
       : ["TOTAL", `${invoices.length} fact.`, "", String(sum(invoices, "cajas")), String(sum(invoices, "und")), n2(sum(invoices, "venta"))], { bold: true });
   }
+  seccionProductos(d, invoices, filas);
   return d.bytes();
 }
 
