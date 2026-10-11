@@ -50,6 +50,10 @@ export function Reportes() {
     () => filtrarPorZonas(todas.filter((i) => (vista === "viveres" ? i.diario : !i.diario)), zonasSel),
     [todas, vista, zonasSel],
   );
+  const [cks, setCks] = useState<Checklist[]>([]);
+  useEffect(() => { void listChecklists().then(setCks); }, [rango]);
+  const notasCk = useNotasCredito();
+  const filasCk = useMemo(() => aplicarNotas(aplanar(cks), notasCk), [cks, notasCk]);
   const zonasTxt = zonasSel.length ? ` · Zonas: ${zonasSel.join(", ")}` : "";
   const zonasArch = zonasSel.length ? `_${zonasSel.join("-").replace(/[^A-Za-z0-9-]+/g, "_")}` : "";
   const periodo = `Del ${formatDate(desde)} al ${formatDate(hasta)}${zonasTxt}`;
@@ -60,13 +64,13 @@ export function Reportes() {
   };
   const previsualizar = async (vendedor: string, facturas: Invoice[]) => {
     const tipo = vista === "viveres" ? "viveres" : "kilos";
-    const data = await buildVendedorPorFechaPdf(vendedor, facturas, periodoTxt, tipo);
+    const data = await buildVendedorPorFechaPdf(vendedor, facturas, periodoTxt, tipo, filasCk);
     const nom = vendedor.replace(/[^A-Za-z0-9]+/g, "_");
     setPreview({ titulo: `${tipo === "kilos" ? "Kilos" : "Víveres"} · ${vendedor}`, name: `Reporte_${tipo}_${nom}${zonasArch}_${desde}_a_${hasta}.pdf`, data });
   };
 
   const exportar = async (tipo: "ventas" | "kilos", imprimir = false) => {
-    const bytes = tipo === "ventas" ? await buildVentasDiariasPdf(invoices, semana, periodo) : await buildKilosVendedorPdf(invoices, semana, periodo);
+    const bytes = tipo === "ventas" ? await buildVentasDiariasPdf(invoices, semana, periodo, filasCk) : await buildKilosVendedorPdf(invoices, semana, periodo, filasCk);
     if (imprimir) return printPdf(bytes, false);
     const pre = vista === "viveres" ? "Viveres_" : "";
     const name = `${pre}${tipo === "ventas" ? "Relacion_ventas_diarias" : "Reporte_kilos_vendedor"}${zonasArch}_${desde}_a_${hasta}.pdf`;
