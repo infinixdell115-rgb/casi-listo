@@ -127,7 +127,7 @@ function seccionProductos(d: Doc, invoices: Invoice[], filas?: FilaProducto[]) {
   const zonas = new Map<string, FilaProducto[]>();
   mias.forEach((r) => zonas.set(normalizar(r.zona), [...(zonas.get(normalizar(r.zona)) ?? []), r]));
   [...zonas.values()].sort((a, b) => b.reduce((s, r) => s + r.kilos, 0) - a.reduce((s, r) => s + r.kilos, 0))
-    .forEach((l) => tabla(`PRODUCTOS · ZONA ${l[0].zona}`, l));
+    .forEach((l) => tabla(`PRODUCTOS · ZONA ${l[0]?.zona ?? ""}`, l));
   const sin = nums.size - conCk.size;
   if (sin > 0) d.heading(`Nota: ${sin} factura(s) de este reporte no tienen checklist asociado.`);
 }
