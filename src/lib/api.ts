@@ -12,6 +12,7 @@ export const MODULOS = [
   { id: "lista", label: "Lista de facturas" },
   { id: "facturas_editar", label: "Editar facturas" },
   { id: "facturas_eliminar", label: "Eliminar facturas" },
+  { id: "novedades_editar", label: "Editar novedades" },
   { id: "despachos_eliminar", label: "Eliminar relaciones de despacho" },
 ] as const;
 export type ModuloId = (typeof MODULOS)[number]["id"];

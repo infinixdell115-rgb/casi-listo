@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const PORT = 4590;
 const ADMIN = "ADMINISTRADOR";
 const ADMIN_CLAVE = "123456";
-const MODULOS = ["registrar", "pendientes", "novedades", "despacho", "anulaciones", "carpeta", "reportes", "checklist", "master", "lista", "facturas_editar", "facturas_eliminar"];
+const MODULOS = ["registrar", "pendientes", "novedades", "despacho", "anulaciones", "carpeta", "reportes", "checklist", "master", "lista", "facturas_editar", "facturas_eliminar", "novedades_editar"];
 
 function startServer({ dataDir, backupDir }) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -225,6 +225,7 @@ function startServer({ dataDir, backupDir }) {
             patch[k] = b[k];
           }
         }
+        if (f.novedad && patch.novedad && !puede(u, "novedades_editar")) return send(res, 403, { error: "No tienes permiso para editar novedades." });
         if (patch.nota_credito) patch.nota_credito = { ...patch.nota_credito, por: u.usuario, fecha: new Date().toISOString() };
         if ("novedad" in patch && !patch.novedad) patch.nota_credito = null;
         if ("novedad" in patch) patch.novedad_por = patch.novedad ? u.usuario : null;
