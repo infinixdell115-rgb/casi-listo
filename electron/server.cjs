@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const PORT = 4590;
 const ADMIN = "ADMINISTRADOR";
 const ADMIN_CLAVE = "123456";
-const MODULOS = ["registrar", "pendientes", "novedades", "despacho", "anulaciones", "carpeta", "reportes", "checklist", "master", "lista", "facturas_editar", "facturas_eliminar", "novedades_editar"];
+const MODULOS = ["registrar", "pendientes", "novedades", "despacho", "anulaciones", "carpeta", "reportes", "checklist", "master", "lista", "facturas_editar", "facturas_eliminar", "novedades_editar", "despachos_eliminar"];
 
 function startServer({ dataDir, backupDir }) {
   fs.mkdirSync(dataDir, { recursive: true });
