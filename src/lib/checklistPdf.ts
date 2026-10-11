@@ -134,9 +134,9 @@ export async function buildChecklistFacturaPdf(
     const peso = recibidoProducto == null || totalProducto <= 0
       ? original
       : recibidoProducto * (original / totalProducto);
-    return { ...item, peso };
+    return { ...item, peso, pesoOriginal: original };
   });
-  const totalOriginal = rows.reduce((sum, item) => sum + parseKilos(item.peso), 0);
+  const totalOriginal = rows.reduce((sum, item) => sum + item.pesoOriginal, 0);
   const totalNeto = rows.reduce((sum, item) => sum + item.peso, 0);
 
   const drawHeader = () => {
