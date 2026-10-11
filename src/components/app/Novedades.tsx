@@ -5,12 +5,21 @@ import type { NotaCreditoItem } from "@/lib/notaCredito";
 import type { FacturaDb } from "@/lib/store";
 import type { Checklist } from "@/lib/types";
 import { toast } from "sonner";
+import { Eye, X } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, TextInput, inputClass } from "./ui";
 import { useStore } from "@/lib/store";
 import { formatDate } from "@/lib/excel";
 
 export function Novedades() {
-  const { invoices, todas, sidecar, setNovedad, removeNovedad } = useStore();
+  const { invoices: invSemana, todas, sidecar, setNovedad, removeNovedad, user } = useStore();
+  const puedeEditarNov = user.esAdmin || (user.modulos as string[]).includes("novedades_editar");
+  const [ver, setVer] = useState<string | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
+  const invoices = useMemo(() => {
+    if (!editando || invSemana.some((i) => i.id === editando)) return invSemana;
+    const extra = todas.find((i) => i.id === editando);
+    return extra ? [extra, ...invSemana] : invSemana;
+  }, [invSemana, todas, editando]);
   const [facturaSel, setFacturaSel] = useState("");
   const [texto, setTexto] = useState("");
   const [tipo, setTipo] = useState<"normal" | "nc">("normal");
@@ -41,7 +50,7 @@ export function Novedades() {
 
   const elegir = (id: string) => {
     setFacturaSel(id);
-    const inv = invoices.find((i) => i.id === id) as FacturaDb | undefined;
+    const inv = (invoices.find((i) => i.id === id) ?? todas.find((i) => i.id === id)) as FacturaDb | undefined;
     setTexto(inv ? (sidecar.novedades[inv.factura]?.texto ?? "") : "");
     const nc = inv?.notaCredito;
     setTipo(nc ? "nc" : "normal");
@@ -68,7 +77,7 @@ export function Novedades() {
   }, [sidecar.novedades, buscar]);
 
   const guardar = () => {
-    const inv = invoices.find((i) => i.id === facturaSel);
+    const inv = invoices.find((i) => i.id === facturaSel) ?? todas.find((i) => i.id === facturaSel);
     if (!inv) {
       toast.error("Selecciona una factura.");
       return;
@@ -90,12 +99,14 @@ export function Novedades() {
     setTexto("");
     setItems([]);
     setTipo("normal");
+    setFacturaSel("");
+    setEditando(null);
     toast.success("Novedad guardada.");
   };
 
   return (
     <div className="flex flex-col gap-5">
-      <Card title="Registrar novedad">
+      <Card title={editando ? "Editar novedad" : "Registrar novedad"}>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Factura">
             <select
@@ -191,14 +202,20 @@ export function Novedades() {
                     <td className="px-2 py-2 font-medium">{n.factura}</td>
                     <td className="px-2 py-2">{n.cliente}</td>
                     <td className="px-2 py-2">{n.vendedor}</td>
-                    <td className="px-2 py-2 whitespace-pre-wrap">
-                      {(() => {
-                        const f = todas.find((x) => x.factura === n.factura && x.notaCredito);
-                        return f?.notaCredito ? <Badge>NC {(f.notaCredito.kilos_recibidos - f.kilosFacturados).toFixed(2)} kg</Badge> : null;
-                      })()} {n.texto}
+                    <td className="px-2 py-2">
+                      <Button variant="outline" onClick={() => setVer(n.factura)}><Eye className="size-4" />Previsualizar</Button>
                     </td>
                     <td className="px-2 py-2">{formatDate(n.fecha)}</td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="whitespace-nowrap px-2 py-2 text-right">
+                      {puedeEditarNov && (
+                        <button className="mr-3 text-xs uppercase text-primary" onClick={() => {
+                          const f = todas.find((x) => x.factura === n.factura && !x.anulada);
+                          if (!f) { toast.error("No se encontró la factura."); return; }
+                          setEditando(f.id);
+                          elegir(f.id);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}>Editar</button>
+                      )}
                       <button
                         className="text-xs uppercase text-destructive"
                         onClick={() => removeNovedad(n.factura)}
@@ -213,6 +230,51 @@ export function Novedades() {
           </div>
         )}
       </Card>
+      {ver && (() => {
+        const n = sidecar.novedades[ver];
+        const f = todas.find((x) => x.factura === ver && !x.anulada) as FacturaDb | undefined;
+        const nc = f?.notaCredito;
+        const prods = nc?.items?.length ? nc.items : productosDe(ver);
+        const tf = prods.reduce((s, p) => s + p.facturado, 0);
+        const tr = prods.reduce((s, p) => s + p.recibido, 0);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={() => setVer(null)}>
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border border-border bg-card p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-start gap-2">
+                <div>
+                  <p className="text-sm font-semibold">Factura {ver} · {n?.cliente}</p>
+                  <p className="text-xs text-muted-foreground">{n?.vendedor}{f ? ` · ${f.lugar} · ${formatDate(f.fecha)} · ${(f.kilosFacturados ?? f.kilos).toFixed(2)} kg facturados` : ""}</p>
+                </div>
+                <button aria-label="Cerrar" className="ml-auto text-muted-foreground hover:text-foreground" onClick={() => setVer(null)}><X className="size-5" /></button>
+              </div>
+              {prods.length ? (
+                <table className="w-full text-sm">
+                  <thead><tr className="text-[11px] uppercase text-muted-foreground"><th className="p-1 text-left">Producto</th><th className="p-1 text-right">Kilos checklist</th>{nc && <><th className="p-1 text-right">Recibió</th><th className="p-1 text-right">Diferencia</th></>}</tr></thead>
+                  <tbody>
+                    {prods.map((p) => (
+                      <tr key={p.producto} className="border-t border-border/60">
+                        <td className="p-1">{p.producto}</td>
+                        <td className="p-1 text-right">{p.facturado.toFixed(2)}</td>
+                        {nc && <><td className="p-1 text-right">{p.recibido.toFixed(2)}</td><td className="p-1 text-right text-destructive">{(p.recibido - p.facturado).toFixed(2)}</td></>}
+                      </tr>
+                    ))}
+                    <tr className="border-t border-border font-semibold">
+                      <td className="p-1">TOTAL</td><td className="p-1 text-right">{tf.toFixed(2)}</td>
+                      {nc && <><td className="p-1 text-right">{tr.toFixed(2)}</td><td className="p-1 text-right text-destructive">{(tr - tf).toFixed(2)}</td></>}
+                    </tr>
+                  </tbody>
+                </table>
+              ) : <p className="text-sm text-muted-foreground">Esta factura no tiene checklist asociado.</p>}
+              <div className="mt-4 rounded-md border border-border bg-muted/40 p-3">
+                <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+                  {nc ? `Nota de crédito · ${(nc.kilos_recibidos - (f?.kilosFacturados ?? 0)).toFixed(2)} kg · kilos de la factura: ${Number(nc.kilos_recibidos).toFixed(2)}` : "Novedad"}
+                </p>
+                <p className="whitespace-pre-wrap text-sm">{n?.texto}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
