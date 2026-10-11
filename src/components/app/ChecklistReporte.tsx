@@ -215,6 +215,12 @@ export function ChecklistReporte({ lista, onUpdate }: { lista: Checklist[]; onUp
         { titulo: "CLIENTES", filas: clientes },
         ...(vend ? [] : [{ titulo: "VENDEDORES", filas: porVendedor }]),
         ...(zona ? [] : [{ titulo: "ZONAS", filas: porZona }]),
+        ...(zona
+          ? []
+          : porZona.map((z) => ({
+              titulo: `ZONA: ${z.nombre} — PRODUCTOS (${z.kilos.toFixed(2)} kg)`,
+              filas: agrupar(filas.filter((r) => r.zona === z.nombre), "producto"),
+            }))),
       ],
     });
     await printPdf(bytes);
@@ -262,7 +268,30 @@ export function ChecklistReporte({ lista, onUpdate }: { lista: Checklist[]; onUp
           </div>
           {tab === "productos" && <Ranking filas={productos} etiqueta="Producto" />}
           {tab === "clientes" && <Ranking filas={clientes} etiqueta="Cliente" />}
-          {tab === "zonas" && <Ranking filas={porZona} etiqueta="Zona" />}
+          {tab === "zonas" && (
+            <div className="space-y-2">
+              {porZona.map((z) => {
+                const sus = filas.filter((r) => r.zona === z.nombre);
+                const sp = agrupar(sus, "producto");
+                const sc = agrupar(sus, "cliente");
+                const open = abierto === z.nombre;
+                return (
+                  <div key={z.nombre} className="rounded-md border border-border">
+                    <button className="flex w-full items-center justify-between p-3 text-left text-sm" onClick={() => setAbierto(open ? null : z.nombre)}>
+                      <span className="flex items-center gap-2 font-semibold">{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}{z.nombre}</span>
+                      <span className="text-muted-foreground">Más vendido: <strong className="text-foreground">{sp[0]?.nombre}</strong> · Menos vendido: <strong className="text-foreground">{sp[sp.length - 1]?.nombre}</strong> · <strong className="text-foreground">{z.kilos.toFixed(2)} kg</strong></span>
+                    </button>
+                    {open && (
+                      <div className="grid gap-3 border-t border-border p-3 md:grid-cols-2">
+                        <Ranking filas={sp} etiqueta="Producto" />
+                        <Ranking filas={sc} etiqueta="Cliente" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {tab === "vendedores" && (
             <div className="space-y-2">
               {porVendedor.map((v) => {
