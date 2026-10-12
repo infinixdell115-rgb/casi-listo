@@ -13,5 +13,5 @@
 - [x] CheckList: segundo checklist, búsqueda por ambos e impresión vertical.
 - [x] Sistema local en red: PC servidor, usuarios creados por el administrador con permisos por módulo.
 - [x] Empaquetar y entregar la versión actualizada para Windows 7 de 32 bits (checklist vertical en Lista de facturas).
-- [ ] Entregar el código fuente completo del proyecto en un ZIP.
-- [ ] Explicar qué se necesita para abrir el proyecto en otra cuenta de Lovable.
+- [x] Entregar el código fuente completo del proyecto en un ZIP.
+- [x] Explicar qué se necesita para abrir el proyecto en otra cuenta de Lovable.
