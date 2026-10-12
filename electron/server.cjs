@@ -44,6 +44,10 @@ function startServer({ dataDir, backupDir }) {
     let cambio = false;
     for (const col of ["facturas", "checklists", "pendientes", "despachos"]) for (const r of db[col] || []) {
       if (r && r.fecha) { const n = normFecha(r.fecha); if (n !== r.fecha) { r.fecha = n; cambio = true; } }
+      if (col === "facturas" && r && !["embutidos", "viveres", "limpieza"].includes(r.tipo)) {
+        r.tipo = r.diario ? "viveres" : "embutidos";
+        cambio = true;
+      }
     }
     if (cambio) fs.writeFileSync(dbPath, JSON.stringify(db));
   }
@@ -177,7 +181,9 @@ function startServer({ dataDir, backupDir }) {
           lugar: String(r.lugar || ""), vendedor: String(r.vendedor || ""), cajas: r.cajas == null ? null : Number(r.cajas),
           und: r.und == null ? null : Number(r.und),
           m500: r.m500 == null ? null : Number(r.m500), m900: r.m900 == null ? null : Number(r.m900),
-          m_ahumada: r.m_ahumada == null ? null : Number(r.m_ahumada), m_carne: r.m_carne == null ? null : Number(r.m_carne), diario: !!r.diario, novedad: null, novedad_fecha: null, en_carpeta: false,
+          m_ahumada: r.m_ahumada == null ? null : Number(r.m_ahumada), m_carne: r.m_carne == null ? null : Number(r.m_carne),
+          tipo: ["embutidos", "viveres", "limpieza"].includes(r.tipo) ? r.tipo : (r.diario ? "viveres" : "embutidos"),
+          diario: !!r.diario, novedad: null, novedad_fecha: null, en_carpeta: false,
           anulada: false, anulada_motivo: null, anulada_en: null, anulada_por: null, creado_por: u.usuario,
           created_at: new Date(Date.parse(now) + i).toISOString(),
         }));
@@ -192,12 +198,13 @@ function startServer({ dataDir, backupDir }) {
         if (!f) return send(res, 404, { error: "Factura no encontrada." });
         if (!esMio(u, f)) return send(res, 403, { error: "Esta factura no es tuya." });
         const b = await leerBody(req);
-        const txt = ["cliente", "fecha", "factura", "lugar", "vendedor", "dia"];
+        const txt = ["cliente", "fecha", "factura", "lugar", "vendedor", "dia", "tipo"];
         const num = ["kilos", "venta"];
         const opt = ["cajas", "und", "m500", "m900", "m_ahumada", "m_carne"];
         for (const k of txt) if (k in b) f[k] = String(b[k] ?? "");
         for (const k of num) if (k in b) f[k] = Number(b[k]) || 0;
         for (const k of opt) if (k in b) f[k] = b[k] == null || b[k] === "" ? null : Number(b[k]);
+        if ("tipo" in b && !["embutidos", "viveres", "limpieza"].includes(f.tipo)) f.tipo = f.diario ? "viveres" : "embutidos";
         if ("dia" in b) f.diario = f.dia === "DIARIO";
         f.editado_por = u.usuario; f.editado_en = new Date().toISOString();
         guardar(); avisar("facturas");

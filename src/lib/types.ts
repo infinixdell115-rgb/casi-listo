@@ -12,6 +12,13 @@ export const DESPACHO_SHEET = "RELACION DE DESPACHO CON TODOS";
 export const DIARIO_SHEET = "DIARIO";
 export const GUIA_SHEET = "GUIA DE DESPACHO";
 
+export type TipoFactura = "embutidos" | "viveres" | "limpieza";
+
+export function tipoDeFactura(f: { tipo?: TipoFactura; diario?: boolean; vendedor?: string }): TipoFactura {
+  if (f.tipo === "limpieza" || f.tipo === "viveres" || f.tipo === "embutidos") return f.tipo;
+  return f.diario || isViveres(f.vendedor || "") ? "viveres" : "embutidos";
+}
+
 /** Factura de víveres: el vendedor termina en "VIVERES". */
 export function isViveres(vendedor: string) {
   return /VIVERES\s*\)?\s*$/i.test((vendedor || "").trim());
@@ -33,6 +40,7 @@ export interface Invoice {
   cajas?: number;
   und?: number;
   diario?: boolean;
+  tipo?: TipoFactura;
   /** mortadelas vendidas en esta factura (unidades) */
   m500?: number;
   m900?: number;
@@ -64,6 +72,7 @@ export function headerParaFacturas<H extends { g500: string; g900: string; carne
 export interface PendingInvoice {
   id: string;
   sheet: DaySheet | "DIARIO";
+  tipo?: TipoFactura;
   cajas?: number;
   und?: number;
   cliente: string;

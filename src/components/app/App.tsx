@@ -36,6 +36,7 @@ import { Carpeta } from "@/components/app/Carpeta";
 import { Reportes } from "@/components/app/Reportes";
 import { MasterClientes } from "@/components/app/MasterClientes";
 import { ChecklistModulo } from "@/components/app/Checklist";
+import { LOGO_PNG_BASE64 } from "@/assets/logo";
 
 export function App() {
   return (
@@ -99,9 +100,11 @@ function Shell() {
     <div className="flex min-h-screen bg-background text-foreground">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
         <div className="px-5 py-6">
-          <h1 className="text-lg font-bold uppercase tracking-wide text-sidebar-accent-foreground">
-            Facturación
-          </h1>
+          <img
+            src={`data:image/png;base64,${LOGO_PNG_BASE64}`}
+            alt="El Cibao"
+            className="mb-2 h-14 w-auto max-w-full object-contain object-left"
+          />
           <p className="text-[11px] text-sidebar-foreground/70">Relación de Ventas Diarias</p>
         </div>
         <nav className="flex flex-col gap-1 px-2">

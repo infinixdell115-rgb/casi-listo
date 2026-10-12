@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, escucharCambios } from "./api";
 import { toFactura, type FacturaDb, type Row } from "./store";
+import type { TipoFactura } from "./types";
 
 const numFact = (f: string) => {
   const n = parseInt(String(f || "").replace(/\D/g, ""), 10);
@@ -23,6 +24,9 @@ export const conViveres = (v: string) => {
   const b = baseVendedor(v);
   return b ? `${b} VIVERES` : "";
 };
+
+export const etiquetaTipoFactura = (tipo: TipoFactura) =>
+  tipo === "viveres" ? "Víveres" : tipo === "limpieza" ? "Productos de limpieza" : "Embutidos";
 
 /** Todas las facturas visibles para el usuario (todas las semanas). */
 export function useFacturasTodas() {
